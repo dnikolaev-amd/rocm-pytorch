@@ -61,6 +61,11 @@ class TORCH_API TensorpipeDeviceTypeConverterRegistrar {
 
 inline const TensorpipeDeviceTypeConverter* getDeviceTypeConverter(
     DeviceType type) {
+#if defined(USE_ROCM)
+  if (type == DeviceType::CUDA)
+        type = DeviceType::HIP;
+#endif
+  TORCH_WARN("$$$$$$$$$$$$$$$ device_type=", type, " enum=", static_cast<size_t>(type))
   return device_type_converter_registry[static_cast<size_t>(type)].load();
 }
 

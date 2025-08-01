@@ -126,6 +126,7 @@ std::array<
 TensorpipeDeviceTypeConverterRegistrar::TensorpipeDeviceTypeConverterRegistrar(
     DeviceType type,
     const TensorpipeDeviceTypeConverter* impl) {
+  TORCH_WARN("########## STORE type=", type, ":", static_cast<size_t>(type), " impl=", impl)
   device_type_converter_registry[static_cast<size_t>(type)].store(impl);
 }
 
@@ -186,8 +187,10 @@ std::tuple<tensorpipe::Message, TensorpipeWriteBuffers> tensorpipeSerialize(
   for (const auto i : c10::irange(tensorDataVec.size())) {
     const torch::Tensor& tensor = tensorDataVec[i];
 
+    TORCH_WARN("$$$$$$$$$$$$$$$ device_type=", tensor.device().type())
     const TensorpipeDeviceTypeConverter* converter =
         getDeviceTypeConverter(tensor.device().type());
+    TORCH_WARN("$$$$$$$$$$$$$$$ converter=", converter)
     TORCH_CHECK(
         converter != nullptr,
         "Attempting to send a Tensor with unexpected device type ",
