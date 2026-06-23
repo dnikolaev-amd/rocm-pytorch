@@ -106,6 +106,8 @@ struct TORCH_CUDA_CPP_API CUDAGraph {
   bool capture_ended_ = false;
   // Set to true in capture_end if cudaGraphInstantiate succeeded
   bool has_graph_exec_ = false;
+  // Set after beginAllocateToPool in capture_begin, cleared in capture_end/reset.
+  bool recording_to_pool_ = false;
 
   // the ID assigned by cuda during graph capture,
   // used to identify when a stream is participating in capture

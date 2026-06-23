@@ -150,6 +150,7 @@ void CUDAGraph::capture_begin(MempoolId_t pool/*={0,0}*/, cudaStreamCaptureMode 
   c10::cuda::CUDACachingAllocator::beginAllocateToPool(capture_dev_, mempool_id_, create_allocate_filter<cudaStream_t>());
 
   at::getHostAllocator(at::kCUDA)->begin_allocate_to_pool(mempool_id_, create_allocate_filter<c10::Stream>());
+  recording_to_pool_ = true;
 
   // cudaStreamCaptureModeGlobal is the most conservative option to
   // prevent potentially unsafe CUDA API calls during capture.  See
@@ -189,10 +190,15 @@ void CUDAGraph::capture_end() {
         "capture_end() called before capture_begin().");
     _currently_capturing_graphs.erase(capture_id_);
   }
-  AT_CUDA_CHECK(endCaptureErr);
 
+  // Always end pool recording once cudaStreamEndCapture returns, even if capture
+  // failed. Otherwise beginAllocateToPool's captures_underway entry leaks and
+  // later allocator syncs (e.g. MemPool destruction) can assert.
   c10::cuda::CUDACachingAllocator::endAllocateToPool(capture_dev_, mempool_id_);
   at::getHostAllocator(at::kCUDA)->end_allocate_to_pool(mempool_id_);
+  recording_to_pool_ = false;
+
+  AT_CUDA_CHECK(endCaptureErr);
 
   TORCH_CHECK(graph_ != nullptr, "Invalid capture.");
 
@@ -333,6 +339,12 @@ void CUDAGraph::reset() {
     std::lock_guard<std::mutex> lock(_currently_capturing_graphs_mutex);
     _currently_capturing_graphs.erase(capture_id_);
     capture_id_ = 0;
+  }
+
+  if (recording_to_pool_) {
+    c10::cuda::CUDACachingAllocator::endAllocateToPool(capture_dev_, mempool_id_);
+    at::getHostAllocator(at::kCUDA)->end_allocate_to_pool(mempool_id_);
+    recording_to_pool_ = false;
   }
 
   if (capture_ended_) {
